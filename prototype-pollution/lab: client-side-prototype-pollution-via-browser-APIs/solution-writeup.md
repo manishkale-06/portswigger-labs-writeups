@@ -1,4 +1,4 @@
-# Client-side prototype pollution via browser APIs
+# Lab: Client-side prototype pollution via browser APIs
 
 ## Description
 

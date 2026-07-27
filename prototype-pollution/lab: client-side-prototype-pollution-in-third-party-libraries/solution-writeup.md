@@ -1,4 +1,4 @@
-# Client-side Prototype Pollution in Third-party Libraries
+# Lab: Client-side Prototype Pollution in Third-party Libraries
 
 ## Objective
 

@@ -1,4 +1,4 @@
-# Client-side Prototype Pollution via Flawed Sanitization
+# Lab: Client-side Prototype Pollution via Flawed Sanitization
 
 ## Objective
 

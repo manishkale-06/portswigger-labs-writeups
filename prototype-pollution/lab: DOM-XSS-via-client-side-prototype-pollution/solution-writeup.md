@@ -1,4 +1,4 @@
-# Exploiting a Mass Assignment Vulnerability
+# Lab: Exploiting a Mass Assignment Vulnerability
 
 ## Lab Description
 

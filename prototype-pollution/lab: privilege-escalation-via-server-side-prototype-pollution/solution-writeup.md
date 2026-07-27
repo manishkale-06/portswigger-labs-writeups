@@ -1,4 +1,4 @@
-# Server-side prototype pollution via flawed object merging
+# Lab: Server-side prototype pollution via flawed object merging
 
 ## Lab Description
 

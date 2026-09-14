@@ -1,4 +1,4 @@
-# CSRF where Referer validation can be circumvented
+#LAB: CSRF where Referer validation can be circumvented
 
 ## Lab Description
 

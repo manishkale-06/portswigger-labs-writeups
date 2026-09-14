@@ -1,4 +1,4 @@
-# SameSite Strict bypass via client-side redirect
+#LAB: SameSite Strict bypass via client-side redirect
 
 ## Objective
 
